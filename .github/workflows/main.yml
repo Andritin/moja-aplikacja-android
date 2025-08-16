@@ -1,0 +1,20 @@
+name: Buildozer Android
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Build and Deploy
+        uses: Artem-B/buildozer-action@v1.0.1
+        with:
+          command: 'buildozer android debug'
+          # Dodaj tutaj swoje klucze debugowania, jeśli chcesz podpisywać aplikację,
+          # ale do testów nie jest to konieczne.
