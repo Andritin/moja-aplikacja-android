@@ -21,5 +21,9 @@ jobs:
           pip install "setuptools<68.0.0"
           pip install cython==0.29.34 buildozer
 
+      - name: Accept Android Licenses
+        run: |
+          yes | buildozer android update
+
       - name: Build and deploy
         run: buildozer android debug
