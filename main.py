@@ -2,448 +2,318 @@ import random
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.label import Label
-from kivy.animation import Animation
 from kivy.core.window import Window
-from kivy.graphics import Color, RoundedRectangle, PushMatrix, PopMatrix, Scale, Line
-from kivy.uix.floatlayout import FloatLayout
+from kivy.graphics import Color, RoundedRectangle
 from kivy.properties import ObjectProperty, NumericProperty
 from kivy.uix.button import Button
 from kivy.clock import Clock
 
-# Set the window background color for a better look
+# Sets the window's background color for a better look
 Window.clearcolor = (0.95, 0.95, 0.95, 1)
 
 
 class MyLayout(BoxLayout):
     """
-    Main application layout that contains the flashcard widgets.
+    Main application layout that contains the word display and answer buttons.
     """
-    # Use ObjectProperty to be able to animate the widget within the class
-    card_container = ObjectProperty(None)
-
-    # Variables for dynamic card rotation
-    rotation_angle = NumericProperty(0)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # Set the layout orientation to vertical
+        # Sets the layout orientation to vertical
         self.orientation = 'vertical'
         self.spacing = 30  # Spacing between widgets
         self.padding = 50  # Padding around the content
 
-        # Variable to track which side is visible
-        self.is_front_side = True
-
-        # Variables to detect the gesture
-        self.touch_start_x = 0
-        self.touch_move_x = 0
-        self.is_dragging = False
-
-        # 20 words and their translations
+        # Words and their translations
         self.words = {
-            'dom': 'house',
-            'kot': 'cat',
-            'pies': 'dog',
-            'książka': 'book',
-            'drzewo': 'tree',
-            'samochód': 'car',
-            'woda': 'water',
-            'słońce': 'sun',
-            'księżyc': 'moon',
-            'gwiazda': 'star',
-            'jabłko': 'apple',
-            'banan': 'banana',
-            'stół': 'table',
-            'krzesło': 'chair',
-            'okno': 'window',
-            'drzwi': 'door',
-            'telefon': 'phone',
-            'komputer': 'computer',
-            'szkoła': 'school',
-            'praca': 'work',
+            '52E': '4x4 BB',
+            '56E': '6x6 BB',
+            '56J': '6x6 BB',
+            '58J': '6x6 BB',
+            '96E': '8x8 BB',
+            '4PE': '8x8 BL',
         }
         self.word_keys = list(self.words.keys())
-        self.card_sequence = []  # List to store the card sequence
-        self.card_index = -1  # Index of the current card in the sequence
+        self.word_sequence = []
+        self.word_index = -1
         self.current_word = ''
 
         # Dictionaries to store correct and incorrect answers
         self.correct_words = {}
         self.incorrect_words = {}
 
-        # Create a container that will look like a physical card
-        self.card_container = FloatLayout(
-            size_hint=(0.7, 0.8),  # Card proportions
-            pos_hint={'center_x': 0.5, 'center_y': 0.5},  # Centering
+        # Variable to store the user's composed answer (without spaces)
+        self.composed_answer = ''
+        # List of widgets to display individual characters of the answer
+        self.answer_widgets = []
+
+        # Main container for the word and buttons
+        self.main_container = BoxLayout(
+            orientation='vertical',
+            size_hint=(0.7, 0.8),
+            pos_hint={'center_x': 0.5, 'center_y': 0.5},
+            spacing=20,
+            padding=20,
         )
-        self.add_widget(self.card_container)
+        self.add_widget(self.main_container)
 
-        # Draw the card background (rounded rectangle) and transformations
-        with self.card_container.canvas.before:
-            PushMatrix()
-            # Use Scale for card rotation based on rotation_angle
-            self.rotate = Scale(1, 1, 1)
-            self.rotate.origin = self.card_container.center
+        # Drawing the container background
+        with self.main_container.canvas.before:
+            Color(0.2, 0.5, 0.8, 1)  # New blue color for the main frame
+            self.rect = RoundedRectangle(pos=self.main_container.pos, size=self.main_container.size, radius=[20])
 
-            # Shadow under the card
-            Color(0.8, 0.8, 0.8, 0.5)
-            self.shadow = RoundedRectangle(pos=self.card_container.pos, size=self.card_container.size, radius=[15])
-
-            Color(1, 1, 1, 1)  # White background color
-            self.rect = RoundedRectangle(pos=self.card_container.pos, size=self.card_container.size, radius=[20])
-
-            # Draw a blue pattern around the edges
-            Color(0, 0.5, 1, 1)  # Blue pattern color
-            self.border_lines = [
-                Line(width=2, rectangle=(self.card_container.pos[0] + 5, self.card_container.pos[1] + 5,
-                                         self.card_container.size[0] - 10, self.card_container.size[1] - 10)),
-                Line(width=2, rectangle=(self.card_container.pos[0] + 10, self.card_container.pos[1] + 10,
-                                         self.card_container.size[0] - 20, self.card_container.size[1] - 20)),
-            ]
-
-        # Widget for the front (face) of the card
+        # Label to display the word
         self.word_label = Label(
-            text='',  # Set empty text at the beginning
-            font_size='60sp',  # Increased font size
+            text='',
+            font_size='60sp',
             bold=True,
-            color=(0, 0, 0, 1),  # Black text color
-            size_hint=(1, 1),  # Label takes up the entire space in the container
-            text_size=self.card_container.size,
-            halign='center',  # Horizontal text alignment
-            valign='middle'  # Vertical text alignment
+            color=(1, 1, 1, 1),  # White text for better contrast on blue background
+            size_hint_y=0.2,
+            halign='center',
+            valign='middle'
         )
-        self.card_container.add_widget(self.word_label)
+        self.main_container.add_widget(self.word_label)
 
-        # Add a separate Push/Pop matrix and Scale for the back of the card to prevent mirroring
-        with self.word_label.canvas.before:
-            self.word_text_scale = Scale(1, 1, 1)
-
-        # Widget for the back (reverse) of the card, initially hidden
-        self.translation_label = Label(
-            text='',  # Set empty text at the beginning
-            font_size='60sp',  # Increased font size
-            bold=True,
-            color=(0, 0, 0, 1),  # Black text color
-            size_hint=(1, 1),  # Label takes up the entire space in the container
-            text_size=self.card_container.size,
-            halign='center',  # Horizontal text alignment
-            valign='middle',  # Vertical text alignment
-            opacity=0  # Label is invisible
-        )
-        self.card_container.add_widget(self.translation_label)
-
-        with self.translation_label.canvas.before:
-            self.translation_text_scale = Scale(1, 1, 1)
-
-        # Draw the label frame (blue)
-        with self.card_container.canvas.after:
-            self.label_border = Line(width=2,
-                                     rectangle=(self.word_label.pos[0], self.word_label.pos[1], self.word_label.size[0],
-                                                self.word_label.size[1]))
-            PopMatrix()
-
-        # Add a new BoxLayout for the buttons
-        self.button_layout = BoxLayout(
+        # Container for the answer fields (new frames)
+        self.answer_display_container = BoxLayout(
             orientation='horizontal',
-            size_hint=(0.5, 0.1),
-            pos_hint={'center_x': 0.5, 'y': 0},
-            spacing=30,
-            opacity=0,  # Initially hidden
+            size_hint_y=0.2,
+            spacing=10,
+            pos_hint={'center_x': 0.5}  # Centering the container
         )
-        self.add_widget(self.button_layout)
+        self.main_container.add_widget(self.answer_display_container)
 
-        # "Good" button (thumbs up)
-        self.good_button = Button(
+        # Container for button rows
+        self.button_rows_container = BoxLayout(
+            orientation='vertical',
+            size_hint_y=0.4,
+            spacing=10,
+        )
+        self.main_container.add_widget(self.button_rows_container)
+
+        # First row of buttons (numbers)
+        self.row1 = BoxLayout(orientation='horizontal', spacing=10)
+        numbers = ['2', '4', '6', '8', '10']
+        for num in numbers:
+            btn = Button(text=num, font_size='30sp', size_hint=(1, 1), background_color=(0.3, 0.7, 1.0, 1),
+                         color=(1, 1, 1, 1))
+            btn.bind(on_release=self.compose_answer)
+            self.row1.add_widget(btn)
+        self.button_rows_container.add_widget(self.row1)
+
+        # Second row of buttons (letters)
+        self.row2 = BoxLayout(orientation='horizontal', spacing=10)
+        letters = ['x', 'B', 'L']
+        for letter in letters:
+            btn = Button(text=letter, font_size='30sp', size_hint=(1, 1), background_color=(0.3, 0.7, 1.0, 1),
+                         color=(1, 1, 1, 1))
+            btn.bind(on_release=self.compose_answer)
+            self.row2.add_widget(btn)
+        self.button_rows_container.add_widget(self.row2)
+
+        # Container for control buttons
+        self.control_buttons_container = BoxLayout(
+            orientation='horizontal',
+            size_hint_y=0.2,
+            spacing=20,
+        )
+        self.main_container.add_widget(self.control_buttons_container)
+
+        # "Backspace" button
+        self.backspace_button = Button(
+            text='<-',
+            font_size='30sp',
+            background_color=(0.4, 0.2, 0.1, 1),  # Dark brown for the backspace button
+            color=(1, 1, 1, 1)
+        )
+        self.backspace_button.bind(on_release=self.backspace_answer)
+        self.control_buttons_container.add_widget(self.backspace_button)
+
+        # "Check" button
+        self.check_button = Button(
             text='OK',
-            font_size='40sp',
-            background_color=(0, 0.7, 0, 1),  # Green
-            size_hint=(0.45, 1),
-            disabled=True  # Buttons are disabled by default
+            font_size='30sp',
+            background_color=(0.2, 0.4, 0.2, 1),  # Dark green for the check button
+            color=(1, 1, 1, 1)
         )
-        self.good_button.bind(on_release=lambda instance: self.on_button_press(instance, 'correct'))
-        self.button_layout.add_widget(self.good_button)
+        self.check_button.bind(on_release=self.check_answer)
+        self.control_buttons_container.add_widget(self.check_button)
 
-        # "Bad" button (thumbs down)
-        self.bad_button = Button(
-            text='NOK',
-            font_size='40sp',
-            background_color=(0.9, 0, 0, 1),  # Red
-            size_hint=(0.45, 1),
-            disabled=True  # Buttons are disabled by default
+        # Feedback label
+        self.feedback_label = Label(
+            text='',
+            font_size='30sp',
+            color=(1, 1, 1, 1),  # White text for feedback
+            size_hint_y=0.2,
+            halign='center',
+            valign='middle'
         )
-        self.bad_button.bind(on_release=lambda instance: self.on_button_press(instance, 'incorrect'))
-        self.button_layout.add_widget(self.bad_button)
+        self.main_container.add_widget(self.feedback_label)
 
-        # Start the first card sequence
+        # Updates the graphics when the container size changes
+        self.main_container.bind(pos=self.update_graphics, size=self.update_graphics)
+
+        # Starts a new word sequence
         self.setup_new_sequence()
 
-        # Change touch handling to detect swipe gestures
-        self.card_container.bind(on_touch_down=self.on_touch_down_card, on_touch_move=self.on_touch_move_card,
-                                 on_touch_up=self.on_touch_up_card)
-        self.bind(rotation_angle=self.update_rotation)
-
-        # Update the size and position of all graphic elements
-        self.card_container.bind(pos=self.update_graphics, size=self.update_graphics)
-
-    def on_touch_down_card(self, instance, touch):
-        """
-        Saves the initial touch position if it's on the card.
-        """
-        if instance.collide_point(*touch.pos):
-            self.touch_start_x = touch.x
-            self.is_dragging = True
-            return True
-        return False
-
-    def on_touch_move_card(self, instance, touch):
-        """
-        Dynamically rotates the card while the finger is being moved.
-        """
-        if self.is_dragging and instance.collide_point(*touch.pos):
-            # Calculate the swipe distance
-            swipe_distance = touch.x - self.touch_start_x
-
-            # Map the distance to a rotation angle
-            # The card rotates 180 degrees for a distance equal to the card's width
-            max_rotation_distance = self.card_container.width * 1.5
-            rotation = (swipe_distance / max_rotation_distance) * 180
-
-            # Limit the rotation to 0-180 degrees
-            self.rotation_angle = max(0, min(180, rotation))
-
-            # Change text visibility depending on the rotation
-            if self.rotation_angle > 90:
-                self.word_label.opacity = 0
-                self.translation_label.opacity = 1
-                # Show buttons after flipping
-                anim = Animation(opacity=1, duration=0.2)
-                anim.bind(on_complete=self.enable_buttons)
-                anim.start(self.button_layout)
-            else:
-                self.word_label.opacity = 1
-                self.translation_label.opacity = 0
-                anim = Animation(opacity=0, duration=0.2)
-                anim.bind(on_complete=self.disable_buttons)
-                anim.start(self.button_layout)
-
-            return True
-        return False
-
-    def on_touch_up_card(self, instance, touch):
-        """
-        Finalizes card rotation or initiates rotation on click.
-        """
-        if self.is_dragging:
-            self.is_dragging = False
-
-            swipe_distance = touch.x - self.touch_start_x
-            swipe_threshold = 20  # Threshold to detect a click instead of a gesture
-
-            if abs(swipe_distance) < swipe_threshold:
-                # This was a click, not a swipe, so animate the rotation
-                if self.is_front_side:
-                    Animation(rotation_angle=180, duration=0.25).start(self)
-                else:
-                    Animation(rotation_angle=0, duration=0.25).start(self)
-                self.is_front_side = not self.is_front_side
-            else:
-                # A swipe gesture, finalize the rotation
-                if self.rotation_angle >= 90:
-                    Animation(rotation_angle=180, duration=0.25).start(self)
-                    self.is_front_side = False
-                else:
-                    Animation(rotation_angle=0, duration=0.25).start(self)
-                    self.is_front_side = True
-            return True
-        return False
-
-    def update_rotation(self, instance, value):
-        """
-        Updates the scale based on the rotation_angle to create a 3D rotation effect.
-        """
-        # Calculate the scale value for the X-axis based on the angle.
-        # From 1 (front) to -1 (back), passing through 0.
-        scale_x_value = ((180 - value) / 90) - 1
-        self.rotate.x = scale_x_value
-
-        # Add a Scale to prevent the mirror effect on the text.
-        if value > 90:
-            self.word_label.opacity = 0
-            self.translation_label.opacity = 1
-            # "Un-mirror" the text on the back of the card
-            self.translation_text_scale.x = -1
-            # Show buttons after flipping
-            anim = Animation(opacity=1, duration=0.2)
-            anim.bind(on_complete=self.enable_buttons)
-            anim.start(self.button_layout)
-        else:
-            self.word_label.opacity = 1
-            self.translation_label.opacity = 0
-            self.translation_text_scale.x = 1
-            # Hide buttons when the card returns to the front
-            anim = Animation(opacity=0, duration=0.2)
-            anim.bind(on_complete=self.disable_buttons)
-            anim.start(self.button_layout)
+    def update_graphics(self, instance, value):
+        """Updates the position and size of the background graphics."""
+        self.rect.pos = instance.pos
+        self.rect.size = instance.size
 
     def setup_new_sequence(self):
         """
-        Creates a new, random sequence of 5 words.
+        Creates a new, random sequence of all words.
         """
-        # Shuffle the word keys and select the first 5
+        self.word_keys = list(self.words.keys())
         random.shuffle(self.word_keys)
-        self.card_sequence = self.word_keys[:5]
-        self.card_index = 0
-        self.next_card()
+        self.word_sequence = self.word_keys
+        self.word_index = -1
+        self.next_word()
 
-    def next_card(self):
+    def next_word(self, *args):
         """
-        Displays the next card in the sequence.
+        Displays the next word in the sequence.
         """
-        if self.card_index >= len(self.card_sequence):
-            # If the sequence is finished, end the program
+        self.word_index += 1
+        if self.word_index >= len(self.word_sequence):
             self.show_end_message()
             return
 
-        self.current_word = self.card_sequence[self.card_index]
+        self.current_word = self.word_sequence[self.word_index]
         self.word_label.text = self.current_word
-        self.translation_label.text = self.words[self.current_word]
+        self.composed_answer = ''
 
-        # Reset visibility and scale to show the new card
-        self.is_front_side = True
-        self.word_label.opacity = 1
-        self.translation_label.opacity = 0
-        self.rotate.x = 1
-        self.translation_text_scale.x = 1  # Reset text scale
-        self.rotation_angle = 0  # Reset rotation angle for the new card
+        # Clears and creates a new layout for the answer fields.
+        self.answer_display_container.clear_widgets()
+        self.answer_widgets = []
 
-        # Hide the buttons when a new card appears and disable them
-        anim = Animation(opacity=0, duration=0.2)
-        anim.bind(on_complete=self.disable_buttons)
-        anim.start(self.button_layout)
+        # Create a container for the first three fields.
+        first_group = BoxLayout(orientation='horizontal', spacing=10, size_hint_x=None, width='170dp')
 
-    def disable_buttons(self, animation, widget):
-        """Disables both buttons after the fade-out animation finishes."""
-        self.good_button.disabled = True
-        self.bad_button.disabled = True
+        # Add the first three fields.
+        for i in range(3):
+            answer_box = BoxLayout(size_hint=(None, None), size=('50dp', '50dp'))
+            answer_label = Label(text='', font_size='30sp', bold=True, halign='center', valign='middle',
+                                 color=(0, 0, 0, 1))
+            answer_box.add_widget(answer_label)
+            with answer_box.canvas.before:
+                color_ref = Color(0.85, 0.85, 0.85, 1)
+                rect_ref = RoundedRectangle(pos=answer_box.pos, size=answer_box.size, radius=[10])
+            answer_box.bind(pos=lambda instance, value: setattr(rect_ref, 'pos', instance.pos))
+            answer_box.bind(size=lambda instance, value: setattr(rect_ref, 'size', instance.size))
+            self.answer_widgets.append({'label': answer_label, 'color': color_ref, 'rect': rect_ref})
+            first_group.add_widget(answer_box)
 
-    def enable_buttons(self, animation, widget):
-        """Enables both buttons after the fade-in animation finishes."""
-        self.good_button.disabled = False
-        self.bad_button.disabled = False
+        # Create a container for the last two fields.
+        second_group = BoxLayout(orientation='horizontal', spacing=10, size_hint_x=None, width='110dp')
 
-    def on_button_press(self, instance, result):
+        # Add the last two fields.
+        for i in range(2):
+            answer_box = BoxLayout(size_hint=(None, None), size=('50dp', '50dp'))
+            answer_label = Label(text='', font_size='30sp', bold=True, halign='center', valign='middle',
+                                 color=(0, 0, 0, 1))
+            answer_box.add_widget(answer_label)
+            with answer_box.canvas.before:
+                color_ref = Color(0.85, 0.85, 0.85, 1)
+                rect_ref = RoundedRectangle(pos=answer_box.pos, size=answer_box.size, radius=[10])
+            answer_box.bind(pos=lambda instance, value: setattr(rect_ref, 'pos', instance.pos))
+            answer_box.bind(size=lambda instance, value: setattr(rect_ref, 'size', instance.size))
+            self.answer_widgets.append({'label': answer_label, 'color': color_ref, 'rect': rect_ref})
+            second_group.add_widget(answer_box)
+
+        # Add groups to the main answer container with a spacer between them
+        self.answer_display_container.add_widget(BoxLayout())  # Flexible spacer
+        self.answer_display_container.add_widget(first_group)
+        self.answer_display_container.add_widget(BoxLayout(size_hint_x=None, width='20dp'))  # Fixed spacer
+        self.answer_display_container.add_widget(second_group)
+        self.answer_display_container.add_widget(BoxLayout())  # Flexible spacer
+
+        self.feedback_label.text = ''
+
+        # Enables the buttons
+        self.check_button.disabled = False
+        self.backspace_button.disabled = False
+        self.set_buttons_state(True)
+
+    def compose_answer(self, instance):
         """
-        Handles the "OK" and "NOK" button clicks, disables both,
-        and saves the result.
+        Adds text from the button to the composed answer and updates the answer field.
         """
-        # Disable both buttons to prevent double-clicking
-        self.good_button.disabled = True
-        self.bad_button.disabled = True
+        if self.check_button.disabled:
+            return
 
-        # Save the result
-        if result == 'correct':
+        filled_count = len(self.composed_answer)
+        if filled_count < len(self.answer_widgets):
+            self.composed_answer += instance.text
+            widget_data = self.answer_widgets[filled_count]
+            widget_data['label'].text = instance.text
+
+            # Change the color of the rectangle to white
+            widget_data['color'].rgb = (1, 1, 1)
+
+    def backspace_answer(self, instance):
+        """
+        Removes the last typed character from the answer and restores the placeholder field.
+        """
+        if len(self.composed_answer) > 0:
+            last_filled_index = len(self.composed_answer) - 1
+            widget_data = self.answer_widgets[last_filled_index]
+            self.composed_answer = self.composed_answer[:-1]
+            widget_data['label'].text = ''
+
+            # Change the color of the rectangle back to gray
+            widget_data['color'].rgb = (0.85, 0.85, 0.85)
+
+    def check_answer(self, instance):
+        """
+        Checks if the composed answer is correct and displays feedback.
+        """
+        user_answer = self.composed_answer.strip()
+        correct_answer = self.words[self.current_word].replace(' ', '')
+
+        # Disables the buttons
+        self.check_button.disabled = True
+        self.backspace_button.disabled = True
+        self.set_buttons_state(False)
+
+        if user_answer == correct_answer:
+            self.feedback_label.text = "Poprawnie!"
+            self.feedback_label.color = (0, 0.7, 0, 1)  # Green color
             self.correct_words[self.current_word] = self.words[self.current_word]
         else:
+            self.feedback_label.text = f"Źle. Poprawna odpowiedź to: {self.words[self.current_word]}"
+            self.feedback_label.color = (0.9, 0, 0, 1)  # Red color
             self.incorrect_words[self.current_word] = self.words[self.current_word]
 
-        # Start the transition animation
-        self.animate_next_card_transition()
+        # Schedules the display of the next word after a short delay
+        Clock.schedule_once(self.next_word, 2)
 
-    def animate_next_card_transition(self):
+    def set_buttons_state(self, state):
+        """Sets the state (enabled/disabled) for all answer composition buttons."""
+        for child in self.row1.children:
+            child.disabled = not state
+        for child in self.row2.children:
+            child.disabled = not state
+
+    def show_end_message(self, *args):
         """
-        Cancels all previous animations and starts the transition animation
-        to the next card.
+        Displays the final message and a summary of results.
         """
-        # Cancel any other animations on the card
-        Animation.cancel_all(self.card_container)
-
-        # Slide out animation to the left
-        anim_out = Animation(pos_hint={'center_x': -0.5}, duration=0.5, transition='out_quad')
-        anim_out.bind(on_complete=self.load_and_slide_in_next_card)
-        anim_out.start(self.card_container)
-
-    def load_and_slide_in_next_card(self, animation, widget):
-        """
-        This method is called after the exit animation is complete.
-        It loads a new card and starts the entry animation.
-        """
-        # Load the next card's data first
-        self.card_index += 1
-        self.next_card()
-
-        # Reset the card's position off-screen to the right
-        self.card_container.pos_hint = {'center_x': 1.5, 'center_y': 0.5}
-
-        # Use Clock.schedule_once to ensure the UI updates before starting the next animation.
-        # This prevents the card from "jumping" or starting in the wrong place.
-        Clock.schedule_once(self.start_slide_in_animation, 0)
-
-    def start_slide_in_animation(self, dt):
-        """
-        Starts the slide-in animation for the new card.
-        """
-        # Slide in animation from the right
-        anim_in = Animation(pos_hint={'center_x': 0.5}, duration=0.5, transition='in_quad')
-        anim_in.start(self.card_container)
-
-    def update_graphics(self, instance, value):
-        # The method updates the position and size of all graphic elements.
-        # This unified approach prevents timing issues.
-
-        # Update positions and sizes of the main card elements
-        self.rect.pos = instance.pos
-        self.rect.size = instance.size
-        self.shadow.pos = (instance.pos[0] + 5, instance.pos[1] - 5)
-        self.shadow.size = instance.size
-
-        # Update the position of the labels to always fill the container
-        self.word_label.pos = instance.pos
-        self.word_label.size = instance.size
-        self.translation_label.pos = instance.pos
-        self.translation_label.size = instance.size
-
-        # Update origins for transformations based on the new center of the card and labels
-        self.rotate.origin = instance.center
-        self.word_text_scale.origin = self.word_label.center
-        self.translation_text_scale.origin = self.translation_label.center
-
-        # Update the position of the border lines
-        self.border_lines[0].rectangle = (self.card_container.pos[0] + 5, self.card_container.pos[1] + 5,
-                                          self.card_container.size[0] - 10, self.card_container.size[1] - 10)
-        self.border_lines[1].rectangle = (self.card_container.pos[0] + 10, self.card_container.pos[1] + 10,
-                                          self.card_container.size[0] - 20, self.card_container.size[1] - 20)
-
-        # Update the label frame position
-        if self.is_front_side:
-            self.label_border.rectangle = (self.word_label.pos[0], self.word_label.pos[1], self.word_label.size[0],
-                                           self.word_label.size[1])
-        else:
-            self.label_border.rectangle = (self.translation_label.pos[0], self.translation_label.pos[1],
-                                           self.translation_label.size[0], self.translation_label.size[1])
-
-        # This call is now redundant as we manually update pos/size, but keeping it ensures text_size is always correct.
-        self.word_label.text_size = self.card_container.size
-        self.translation_label.text_size = self.card_container.size
-
-    def show_end_message(self):
-        """
-        Displays the end message and summary, including results.
-        """
-        # Hide the card container and buttons
+        # Hides the main container
         self.clear_widgets()
 
-        # Calculate scores
+        # Calculates the results
         total_questions = len(self.correct_words) + len(self.incorrect_words)
         correct_count = len(self.correct_words)
-        incorrect_count = len(self.incorrect_words)
 
-        # Calculate percentage if there are any questions
+        # Calculates the percentage if there were any questions
         if total_questions > 0:
             percentage = (correct_count / total_questions) * 100
         else:
             percentage = 0
 
-        # Prepare the summary text
+        # Prepares the summary text
         summary_text = "Koniec programu!\n\n"
         summary_text += f"Twój wynik: {correct_count} / {total_questions} poprawnych odpowiedzi.\n"
         summary_text += f"Udział procentowy: {percentage:.2f}%\n\n"
@@ -455,7 +325,7 @@ class MyLayout(BoxLayout):
         else:
             summary_text += "Gratulacje! Wszystkie odpowiedzi były poprawne."
 
-        # Add the end message label
+        # Adds the label with the final message
         end_label = Label(
             text=summary_text,
             font_size='30sp',
@@ -466,7 +336,7 @@ class MyLayout(BoxLayout):
         )
         self.add_widget(end_label)
 
-        # Add an exit button
+        # Adds the exit button
         exit_button = Button(
             text='Zakończ',
             font_size='30sp',
