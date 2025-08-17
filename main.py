@@ -26,12 +26,11 @@ class MyLayout(BoxLayout):
 
         # Words and their translations
         self.words = {
-            '52E': '4x4 BB',
-            '56E': '6x6 BB',
-            '56J': '6x6 BB',
-            '58J': '6x6 BB',
-            '96E': '8x8 BB',
-            '4PE': '8x8 BL',
+            '52E': '4x4 BB Chassis',
+            '56E': '6x6 BB Chassis',
+            '58J': '6x6 BB Sattel',
+            '96E': '8x8 BB Chassis',
+            '4PE': '8x8 BL Chassis',
         }
         self.word_keys = list(self.words.keys())
         self.word_sequence = []
@@ -44,14 +43,11 @@ class MyLayout(BoxLayout):
 
         # Variable to store the user's composed answer (without spaces)
         self.composed_answer = ''
-        # List of widgets to display individual characters of the answer
-        self.answer_widgets = []
 
         # Main container for the word and buttons
         self.main_container = BoxLayout(
             orientation='vertical',
-            size_hint=(0.7, 0.8),
-            pos_hint={'center_x': 0.5, 'center_y': 0.5},
+            size_hint=(1, 1), # Changed to fill the entire screen
             spacing=20,
             padding=20,
         )
@@ -59,7 +55,7 @@ class MyLayout(BoxLayout):
 
         # Drawing the container background
         with self.main_container.canvas.before:
-            Color(0.2, 0.5, 0.8, 1)  # New blue color for the main frame
+            Color(0.58, 0.65, 0.73, 1)  # A soft, calming grey-blue
             self.rect = RoundedRectangle(pos=self.main_container.pos, size=self.main_container.size, radius=[20])
 
         # Label to display the word
@@ -67,7 +63,7 @@ class MyLayout(BoxLayout):
             text='',
             font_size='60sp',
             bold=True,
-            color=(1, 1, 1, 1),  # White text for better contrast on blue background
+            color=(0.1, 0.1, 0.1, 1),  # Dark grey text for readability
             size_hint_y=0.2,
             halign='center',
             valign='middle'
@@ -95,8 +91,8 @@ class MyLayout(BoxLayout):
         self.row1 = BoxLayout(orientation='horizontal', spacing=10)
         numbers = ['2', '4', '6', '8', '10']
         for num in numbers:
-            btn = Button(text=num, font_size='30sp', size_hint=(1, 1), background_color=(0.3, 0.7, 1.0, 1),
-                         color=(1, 1, 1, 1))
+            btn = Button(text=num, font_size='30sp', size_hint=(1, 1), background_color=(0.85, 0.9, 0.95, 1),
+                         color=(0.1, 0.1, 0.1, 1))
             btn.bind(on_release=self.compose_answer)
             self.row1.add_widget(btn)
         self.button_rows_container.add_widget(self.row1)
@@ -105,11 +101,21 @@ class MyLayout(BoxLayout):
         self.row2 = BoxLayout(orientation='horizontal', spacing=10)
         letters = ['x', 'B', 'L']
         for letter in letters:
-            btn = Button(text=letter, font_size='30sp', size_hint=(1, 1), background_color=(0.3, 0.7, 1.0, 1),
-                         color=(1, 1, 1, 1))
+            btn = Button(text=letter, font_size='30sp', size_hint=(1, 1), background_color=(0.85, 0.9, 0.95, 1),
+                         color=(0.1, 0.1, 0.1, 1))
             btn.bind(on_release=self.compose_answer)
             self.row2.add_widget(btn)
         self.button_rows_container.add_widget(self.row2)
+
+        # Third row of buttons (Chassis and Sattel)
+        self.row3 = BoxLayout(orientation='horizontal', spacing=10)
+        words_to_add = [' Chassis', ' Sattel']
+        for word in words_to_add:
+            btn = Button(text=word, font_size='30sp', size_hint=(1, 1), background_color=(0.85, 0.9, 0.95, 1),
+                         color=(0.1, 0.1, 0.1, 1))
+            btn.bind(on_release=self.compose_answer)
+            self.row3.add_widget(btn)
+        self.button_rows_container.add_widget(self.row3)
 
         # Container for control buttons
         self.control_buttons_container = BoxLayout(
@@ -123,32 +129,44 @@ class MyLayout(BoxLayout):
         self.backspace_button = Button(
             text='<-',
             font_size='30sp',
-            background_color=(0.4, 0.2, 0.1, 1),  # Dark brown for the backspace button
+            background_color=(0.9, 0.5, 0.4, 1),  # A warm orange for backspace
             color=(1, 1, 1, 1)
         )
         self.backspace_button.bind(on_release=self.backspace_answer)
         self.control_buttons_container.add_widget(self.backspace_button)
 
         # "Check" button
-        self.check_button = Button(
+        self.ok_button = Button(
             text='OK',
-            font_size='30sp',
-            background_color=(0.2, 0.4, 0.2, 1),  # Dark green for the check button
+            font_size='50sp',
+            background_color=(0.5, 0.8, 0.5, 1),  # A pleasant green for 'OK'
             color=(1, 1, 1, 1)
         )
-        self.check_button.bind(on_release=self.check_answer)
-        self.control_buttons_container.add_widget(self.check_button)
+        self.ok_button.bind(on_release=self.check_answer)
+        self.control_buttons_container.add_widget(self.ok_button)
 
         # Feedback label
         self.feedback_label = Label(
             text='',
             font_size='30sp',
-            color=(1, 1, 1, 1),  # White text for feedback
+            color=(0.9, 0, 0, 1),  # Red text for feedback
             size_hint_y=0.2,
             halign='center',
             valign='middle'
         )
         self.main_container.add_widget(self.feedback_label)
+
+        # Tworzenie pojedynczego labelu do wyświetlenia odpowiedzi
+        answer_label = Label(
+            text='',
+            font_size='30sp',
+            bold=True,
+            halign='center',
+            valign='middle',
+            color=(0.1, 0.1, 0.1, 1)  # Dark grey text
+        )
+        self.answer_display_container.add_widget(answer_label)
+        self.answer_label = answer_label
 
         # Updates the graphics when the container size changes
         self.main_container.bind(pos=self.update_graphics, size=self.update_graphics)
@@ -173,7 +191,7 @@ class MyLayout(BoxLayout):
 
     def next_word(self, *args):
         """
-        Displays the next word in the sequence.
+        Displays the next word in the sequence. Creates answer fields based on the correct answer length.
         """
         self.word_index += 1
         if self.word_index >= len(self.word_sequence):
@@ -183,56 +201,12 @@ class MyLayout(BoxLayout):
         self.current_word = self.word_sequence[self.word_index]
         self.word_label.text = self.current_word
         self.composed_answer = ''
-
-        # Clears and creates a new layout for the answer fields.
-        self.answer_display_container.clear_widgets()
-        self.answer_widgets = []
-
-        # Create a container for the first three fields.
-        first_group = BoxLayout(orientation='horizontal', spacing=10, size_hint_x=None, width='170dp')
-
-        # Add the first three fields.
-        for i in range(3):
-            answer_box = BoxLayout(size_hint=(None, None), size=('50dp', '50dp'))
-            answer_label = Label(text='', font_size='30sp', bold=True, halign='center', valign='middle',
-                                 color=(0, 0, 0, 1))
-            answer_box.add_widget(answer_label)
-            with answer_box.canvas.before:
-                color_ref = Color(0.85, 0.85, 0.85, 1)
-                rect_ref = RoundedRectangle(pos=answer_box.pos, size=answer_box.size, radius=[10])
-            answer_box.bind(pos=lambda instance, value: setattr(rect_ref, 'pos', instance.pos))
-            answer_box.bind(size=lambda instance, value: setattr(rect_ref, 'size', instance.size))
-            self.answer_widgets.append({'label': answer_label, 'color': color_ref, 'rect': rect_ref})
-            first_group.add_widget(answer_box)
-
-        # Create a container for the last two fields.
-        second_group = BoxLayout(orientation='horizontal', spacing=10, size_hint_x=None, width='110dp')
-
-        # Add the last two fields.
-        for i in range(2):
-            answer_box = BoxLayout(size_hint=(None, None), size=('50dp', '50dp'))
-            answer_label = Label(text='', font_size='30sp', bold=True, halign='center', valign='middle',
-                                 color=(0, 0, 0, 1))
-            answer_box.add_widget(answer_label)
-            with answer_box.canvas.before:
-                color_ref = Color(0.85, 0.85, 0.85, 1)
-                rect_ref = RoundedRectangle(pos=answer_box.pos, size=answer_box.size, radius=[10])
-            answer_box.bind(pos=lambda instance, value: setattr(rect_ref, 'pos', instance.pos))
-            answer_box.bind(size=lambda instance, value: setattr(rect_ref, 'size', instance.size))
-            self.answer_widgets.append({'label': answer_label, 'color': color_ref, 'rect': rect_ref})
-            second_group.add_widget(answer_box)
-
-        # Add groups to the main answer container with a spacer between them
-        self.answer_display_container.add_widget(BoxLayout())  # Flexible spacer
-        self.answer_display_container.add_widget(first_group)
-        self.answer_display_container.add_widget(BoxLayout(size_hint_x=None, width='20dp'))  # Fixed spacer
-        self.answer_display_container.add_widget(second_group)
-        self.answer_display_container.add_widget(BoxLayout())  # Flexible spacer
+        self.answer_label.text = ''
 
         self.feedback_label.text = ''
 
         # Enables the buttons
-        self.check_button.disabled = False
+        self.ok_button.disabled = False
         self.backspace_button.disabled = False
         self.set_buttons_state(True)
 
@@ -240,46 +214,44 @@ class MyLayout(BoxLayout):
         """
         Adds text from the button to the composed answer and updates the answer field.
         """
-        if self.check_button.disabled:
+        if self.ok_button.disabled:
             return
 
-        filled_count = len(self.composed_answer)
-        if filled_count < len(self.answer_widgets):
-            self.composed_answer += instance.text
-            widget_data = self.answer_widgets[filled_count]
-            widget_data['label'].text = instance.text
+        # Add a space after the 3rd and 6th character if the answer is not 'Chassis' or 'Sattel'
+        if instance.text not in [' Chassis', ' Sattel']:
+            if len(self.composed_answer) == 3 or len(self.composed_answer) == 7:
+                self.composed_answer += ' '
 
-            # Change the color of the rectangle to white
-            widget_data['color'].rgb = (1, 1, 1)
+        self.composed_answer += instance.text
+        self.answer_label.text = self.composed_answer
 
     def backspace_answer(self, instance):
         """
         Removes the last typed character from the answer and restores the placeholder field.
         """
         if len(self.composed_answer) > 0:
-            last_filled_index = len(self.composed_answer) - 1
-            widget_data = self.answer_widgets[last_filled_index]
             self.composed_answer = self.composed_answer[:-1]
-            widget_data['label'].text = ''
+            # Remove the space before the character if the user backspaces
+            if self.composed_answer.endswith(' '):
+                self.composed_answer = self.composed_answer[:-1]
 
-            # Change the color of the rectangle back to gray
-            widget_data['color'].rgb = (0.85, 0.85, 0.85)
+            self.answer_label.text = self.composed_answer
 
     def check_answer(self, instance):
         """
         Checks if the composed answer is correct and displays feedback.
         """
-        user_answer = self.composed_answer.strip()
+        user_answer = self.composed_answer.strip().replace(' ', '')
         correct_answer = self.words[self.current_word].replace(' ', '')
 
         # Disables the buttons
-        self.check_button.disabled = True
+        self.ok_button.disabled = True
         self.backspace_button.disabled = True
         self.set_buttons_state(False)
 
         if user_answer == correct_answer:
             self.feedback_label.text = "Poprawnie!"
-            self.feedback_label.color = (0, 0.7, 0, 1)  # Green color
+            self.feedback_label.color = (0.5, 0.8, 0.5, 1)  # Green color
             self.correct_words[self.current_word] = self.words[self.current_word]
         else:
             self.feedback_label.text = f"Źle. Poprawna odpowiedź to: {self.words[self.current_word]}"
@@ -294,6 +266,8 @@ class MyLayout(BoxLayout):
         for child in self.row1.children:
             child.disabled = not state
         for child in self.row2.children:
+            child.disabled = not state
+        for child in self.row3.children:
             child.disabled = not state
 
     def show_end_message(self, *args):
